@@ -1,0 +1,97 @@
+name: helix-mcp
+
+services:
+  app:
+    image: ${HELIX_IMAGE:-helix-mcp:local}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m,mode=1777
+    environment:
+      HELIX_DATA_DIR: /data
+      HELIX_MCP_TOKEN_FILE: /run/secrets/mcp_token
+      HELIX_WORKER_TOKEN_FILE: /run/secrets/worker_token
+      HELIX_WORKER_ID: ${HELIX_WORKER_ID:-helix-floor-windows}
+      HELIX_TARGET_SETLIST: ${HELIX_TARGET_SETLIST:-}
+      HELIX_TARGET_SLOT: ${HELIX_TARGET_SLOT:-}
+      HELIX_TARGET_SETLIST_NAME: ${HELIX_TARGET_SETLIST_NAME:-}
+      HELIX_ALLOWED_HOSTS: ${HELIX_DOMAIN:?Set HELIX_DOMAIN in deploy/.env},localhost,127.0.0.1
+      HELIX_ALLOWED_ORIGINS: ${HELIX_ALLOWED_ORIGINS:-}
+    secrets:
+      - mcp_token
+      - worker_token
+    volumes:
+      - ./state/data:/data
+    networks:
+      - backend
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=3).read()"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  caddy:
+    image: ${CADDY_IMAGE:-caddy:2-alpine}
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    environment:
+      HELIX_DOMAIN: ${HELIX_DOMAIN:?Set HELIX_DOMAIN in deploy/.env}
+    ports:
+      - "${HELIX_BIND_IP:-0.0.0.0}:443:443/tcp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - backend
+      - edge
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+secrets:
+  mcp_token:
+    file: ./secrets/mcp_token.txt
+  worker_token:
+    file: ./secrets/worker_token.txt
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  backend:
+    internal: true
+  edge:

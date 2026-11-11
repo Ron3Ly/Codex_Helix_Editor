@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codex-helix-editor"
+version = "0.2.0"
+description = "Private remote MCP service and Windows worker for Helix Floor preset workflows"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "mcp==1.29.0",
+  "starlette==1.6.0",
+  "uvicorn==0.52.1",
+  "httpx==0.28.1",
+  "pydantic==2.13.4",
+]
+
+[project.scripts]
+helix-mcp = "helix_mcp.cli:main"
+helix-worker = "helix_mcp.worker:main"
+helix-preset = "helix_mcp.preset:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+helix_mcp = ["resources/*.ps1"]
